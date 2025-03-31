@@ -8,12 +8,12 @@ import os
 import threading
 
 # Ruta donde están almacenadas las imágenes de los estudiantes
-CARPETA_IMAGENES = "/home/victor/Desktop/Control de acceso estudiantil UPSRJ/FOTOS Alumnos UPSRJ"
+CARPETA_IMAGENES = "/home/aaron-contreras/Documents/GitHub/Sistema-de-Acceso-UPSRJ/FOTOS Alumnos UPSRJ"
 
 # Configuración de GPIO para relevadores
 RELAY_ENTRADA_PIN = 17
 RELAY_SALIDA_PIN = 27
-chip = gpiod.Chip('gpiochip4')  
+chip = gpiod.Chip('gpiochip4')
 relay_entrada_line = chip.get_line(RELAY_ENTRADA_PIN)
 relay_salida_line = chip.get_line(RELAY_SALIDA_PIN)
 relay_entrada_line.request(consumer="RelayEntrada", type=gpiod.LINE_REQ_DIR_OUT)
@@ -36,6 +36,48 @@ def leer_estado_rele(ID1):
     datos = cursor.fetchall()
     conn.close()
     return any(dato[0] for dato in datos)
+
+# Función para registrar el log de acceso
+def registrar_log(ID1, tipo):
+    try:
+        conn = pymysql.connect(user="miusuario", password="10203040", host="localhost", database="estudiantes_upsrj")
+        cursor = conn.cursor()
+        # Se asume que existe una tabla 'registros' con las columnas: id, ID1, tipo, fecha
+        query = "INSERT INTO registros (ID1, tipo, fecha) VALUES (%s, %s, NOW())"
+        cursor.execute(query, (ID1, tipo))
+        conn.commit()
+    except Exception as e:
+        print("Error al registrar log:", e)
+    finally:
+        conn.close()
+
+# Función para mostrar registros de acceso
+def mostrar_registros():
+    try:
+        conn = pymysql.connect(user="miusuario", password="10203040", host="localhost", database="estudiantes_upsrj")
+        cursor = conn.cursor()
+        query = "SELECT ID1, tipo, fecha FROM registros ORDER BY fecha DESC"
+        cursor.execute(query)
+        registros = cursor.fetchall()
+    except Exception as e:
+        messagebox.showerror("Error", f"No se pudieron obtener los registros: {e}")
+        return
+    finally:
+        conn.close()
+    
+    ventana_registros = tk.Toplevel()
+    ventana_registros.title("Registros de Entrada y Salida")
+    
+    text_area = tk.Text(ventana_registros, width=80, height=20)
+    text_area.pack(padx=10, pady=10)
+    
+    if registros:
+        for reg in registros:
+            text_area.insert(tk.END, f"ID: {reg[0]} - Tipo: {reg[1]} - Fecha: {reg[2]}\n")
+    else:
+        text_area.insert(tk.END, "No se encontraron registros.")
+    
+    text_area.config(state=tk.DISABLED)
 
 # Función para mostrar información e imagen del estudiante
 def mostrar_info_estudiante(ID1):
@@ -63,22 +105,23 @@ def mostrar_info_estudiante(ID1):
             label_imagen.image = img
             label_imagen.pack()
         else:
-            tk.Label(ventana_info, text=" Imagen no encontrada", fg="red").pack()
+            tk.Label(ventana_info, text="Imagen no encontrada", fg="red").pack()
 
         ventana_info.mainloop()
     else:
         messagebox.showerror("Error", "Estudiante no encontrado.")
 
-# Función para activar relevador y mostrar información del estudiante
+# Función para activar relevador, registrar log y mostrar información del estudiante
 def activar_rele_y_mostrar_info(ID1, tipo_rele):
     print(f"\n🔹 Recibido ID1: {ID1} desde {tipo_rele.upper()}")
 
     if leer_estado_rele(ID1):
+        registrar_log(ID1, tipo_rele)
         if tipo_rele == "entrada":
             print("Activando relevador de ENTRADA")
             relay_entrada_line.set_value(0)
         elif tipo_rele == "salida":
-            print(" Activando relevador de SALIDA")
+            print("Activando relevador de SALIDA")
             relay_salida_line.set_value(0)
 
         mostrar_info_estudiante(ID1)
@@ -86,7 +129,7 @@ def activar_rele_y_mostrar_info(ID1, tipo_rele):
         time.sleep(4)  # Mantener el relevador activado por 4 segundos
         relay_entrada_line.set_value(1)
         relay_salida_line.set_value(1)
-        print(" Relevadores desactivados\n")
+        print("Relevadores desactivados\n")
     else:
         messagebox.showerror("Acceso denegado", "ID no registrado en el sistema.")
 
@@ -113,7 +156,7 @@ tk.Label(frame_entrada, text="Ingrese ID (Entrada):").pack()
 ID1_entry_entrada = tk.Entry(frame_entrada)
 ID1_entry_entrada.pack()
 ID1_entry_entrada.focus_set()
-ID1_entry_entrada.bind('<KeyRelease>', lambda event: on_entry_change(event, "entrada"))  # Detecta la entrada del RFID
+ID1_entry_entrada.bind('<KeyRelease>', lambda event: on_entry_change(event, "entrada"))
 
 # Sección de Salida
 frame_salida = tk.Frame(root)
@@ -122,7 +165,11 @@ frame_salida.pack(pady=10)
 tk.Label(frame_salida, text="Ingrese ID (Salida):").pack()
 ID1_entry_salida = tk.Entry(frame_salida)
 ID1_entry_salida.pack()
-ID1_entry_salida.bind('<KeyRelease>', lambda event: on_entry_change(event, "salida"))  # Detecta la entrada del RFID
+ID1_entry_salida.bind('<KeyRelease>', lambda event: on_entry_change(event, "salida"))
+
+# Botón para mostrar registros de acceso
+btn_registros = tk.Button(root, text="Ver Registros", command=mostrar_registros)
+btn_registros.pack(pady=10)
 
 print("\nSistema en funcionamiento... esperando lectura RFID.\n")
 
