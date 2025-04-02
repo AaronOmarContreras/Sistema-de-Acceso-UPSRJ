@@ -43,7 +43,7 @@ def registrar_log(ID1, tipo):
         conn = pymysql.connect(user="miusuario", password="10203040", host="localhost", database="estudiantes_upsrj")
         cursor = conn.cursor()
         # Se asume que existe una tabla 'registros' con las columnas: id, ID1, tipo, fecha
-        query = "INSERT INTO registros (ID1, tipo, fecha) VALUES (%s, %s, NOW())"
+        query = "INSERT INTO registros (ID1, tipo_de_registro, fecha) VALUES (%s, %s, NOW())"
         cursor.execute(query, (ID1, tipo))
         conn.commit()
     except Exception as e:
@@ -56,7 +56,7 @@ def mostrar_registros():
     try:
         conn = pymysql.connect(user="miusuario", password="10203040", host="localhost", database="estudiantes_upsrj")
         cursor = conn.cursor()
-        query = "SELECT ID1, tipo, fecha FROM registros ORDER BY fecha DESC"
+        query = "SELECT ID1, tipo_de_registro, fecha FROM registros ORDER BY fecha DESC"
         cursor.execute(query)
         registros = cursor.fetchall()
     except Exception as e:
@@ -106,8 +106,6 @@ def mostrar_info_estudiante(ID1):
             label_imagen.pack()
         else:
             tk.Label(ventana_info, text="Imagen no encontrada", fg="red").pack()
-
-        ventana_info.mainloop()
     else:
         messagebox.showerror("Error", "Estudiante no encontrado.")
 
@@ -119,9 +117,11 @@ def activar_rele_y_mostrar_info(ID1, tipo_rele):
         registrar_log(ID1, tipo_rele)
         if tipo_rele == "entrada":
             print("Activando relevador de ENTRADA")
+            registrar_log(ID1, tipo_rele)
             relay_entrada_line.set_value(0)
         elif tipo_rele == "salida":
             print("Activando relevador de SALIDA")
+            registrar_log(ID1, tipo_rele)
             relay_salida_line.set_value(0)
 
         mostrar_info_estudiante(ID1)
