@@ -133,6 +133,8 @@ def mostrar_info_estudiante(ID1):
 
         else:
             tk.Label(ventana_info, text="Imagen no encontrada", fg="red").pack()
+
+        ventana_info.after(10000, ventana_info.destroy)
     else:
         messagebox.showerror("Error", "Estudiante no encontrado.")
 # Función que detecta cuando el lector RFID inserta un código en el campo de entrada
@@ -207,7 +209,7 @@ tk.Label(frame_entrada, text="Ingrese ID (Entrada):").pack(anchor="w")
 ID1_entry_entrada = tk.Entry(frame_entrada)
 ID1_entry_entrada.pack(fill="x")
 ID1_entry_entrada.focus_set()
-#ID1_entry_entrada.bind('<KeyRelease>', lambda event: on_entry_change(event, "entrada"))
+ID1_entry_entrada.bind('<KeyRelease>', lambda event: on_entry_change(event, "entrada"))
 
 # Sección de Salida
 frame_salida = tk.Frame(root, padx=20, pady=20)
@@ -217,7 +219,7 @@ tk.Label(frame_salida, text="Ingrese ID (Salida):").pack(anchor="w")
 ID1_entry_salida = tk.Entry(frame_salida)
 ID1_entry_salida.pack(fill="x")
 ID1_entry_salida.focus_set()
-#ID1_entry_salida.bind('<KeyRelease>', lambda event: on_entry_change(event, "salida"))
+ID1_entry_salida.bind('<KeyRelease>', lambda event: on_entry_change(event, "salida"))
 
 # Botón para mostrar registros de acceso
 btn_registros = tk.Button(root, text="Ver Registros", command=mostrar_registros)
