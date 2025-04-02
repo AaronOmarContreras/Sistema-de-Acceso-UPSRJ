@@ -9,7 +9,7 @@ import threading
 from evdev import InputDevice, categorize, ecodes
 
 # Ruta donde están almacenadas las imágenes de los estudiantes
-CARPETA_IMAGENES = "/home/aaron-contreras/Documents/GitHub/Sistema-de-Acceso-UPSRJ/FOTOS Alumnos UPSRJ"
+CARPETA_IMAGENES = "/home/victor/Desktop/Control de acceso estudiantil UPSRJ/FOTOS Alumnos UPSRJ"
 
 # Configuración de GPIO para relevadores
 RELAY_ENTRADA_PIN = 17
@@ -40,6 +40,8 @@ def validar_ID_de_acceso(ID1):
 
 # Función para registrar el log de acceso
 def registrar_log(ID1, tipo):
+
+    datos= obtener_datos_estudiante(ID1)
 
     if datos:
         nombre, carrera, matricula = datos
@@ -94,11 +96,11 @@ def mostrar_registros():
     tree.column("tipo", width=100)
     tree.column("fecha", width=150)
     
-    # Insertar cada registro en el Treeview
+
     for reg in registros:
         tree.insert("", tk.END, values=reg)
     
-    # Agregar el Treeview a la ventana y configurar scrollbar vertical
+  
     tree.pack(fill=tk.BOTH, expand=True)
     scrollbar = ttk.Scrollbar(ventana_tabla, orient="vertical", command=tree.yview)
     tree.configure(yscrollcommand=scrollbar.set)
@@ -118,12 +120,11 @@ def mostrar_info_estudiante(ID1):
         label_info = tk.Label(ventana_info, text=info_texto, font=("Arial", 12))
         label_info.pack()
 
-        # Buscar la imagen con el mismo ID
         imagen_path = os.path.join(CARPETA_IMAGENES, f"{ID1}.jpg")
 
-        if os.path.exists(imagen_path):  # Verifica si la imagen existe
+        if os.path.exists(imagen_path): 
             img = Image.open(imagen_path)
-            img = img.resize((200, 200))  # Redimensiona la imagen
+            img = img.resize((200, 200)) 
             img = ImageTk.PhotoImage(img)
 
             label_imagen = tk.Label(ventana_info, image=img)
@@ -175,20 +176,18 @@ def read_rfid(device_path, tipo_rele):
     dev = InputDevice(device_path)
     rfid_code = ""
     for event in dev.read_loop():
-        if event.type == ecodes.EV_KEY and event.value == 1:  # Tecla presionada
+        if event.type == ecodes.EV_KEY and event.value == 1:  
             key_event = categorize(event)
             key = key_event.keycode
-            # Algunos eventos pueden venir como lista, así que tomamos el primer elemento
+            
             if isinstance(key, list):
                 key = key[0]
-            # Si se detecta la tecla ENTER, se asume fin de lectura
             if key == "KEY_ENTER":
                 if len(rfid_code) > 0:
                     print(f"RFID leído desde {device_path}: {rfid_code}")
                     root.after(0, activar_rele_y_mostrar_info, rfid_code, tipo_rele)
                     rfid_code = ""
             else:
-                # Convertir "KEY_#" a carácter
                 if key.startswith("KEY_"):
                     key = key[4:]
                 rfid_code += key
@@ -224,9 +223,9 @@ ID1_entry_salida.focus_set()
 btn_registros = tk.Button(root, text="Ver Registros", command=mostrar_registros)
 btn_registros.pack(pady=10)
 
-lector_entrada_1 = "/dev/input/event3"
+lector_entrada_1 = "/dev/input/event14"
 lector_entrada_2 = "/dev/input/event4"
-lector_salida_1  = "/dev/input/event5"
+lector_salida_1  = "/dev/input/event15"
 lector_salida_2  = "/dev/input/event6"
 
 threading.Thread(target=read_rfid, args=(lector_entrada_1, "entrada"), daemon=True).start()
