@@ -194,7 +194,7 @@ def read_rfid(device_path, tipo_rele):
                 rfid_code += key
 
 root = tk.Tk()
-root.title("Control de Acceso RFID (HID)")
+root.title("Control de Acceso UPSRJ (RFID)")
 root.geometry("800x600")
 root.minsize(500, 300)
 
