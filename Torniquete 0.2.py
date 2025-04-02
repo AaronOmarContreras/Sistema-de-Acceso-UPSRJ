@@ -159,15 +159,15 @@ def activar_rele_y_mostrar_info(ID1, tipo_rele,widget=None):
         registrar_log(ID1, tipo_rele)
         if tipo_rele == "entrada":
             print("Activando relevador de ENTRADA")
-            relay_entrada_line.set_value(0)
+            relay_entrada_line.set_value(1)
         elif tipo_rele == "salida":
             print("Activando relevador de SALIDA")
-            relay_salida_line.set_value(0)
+            relay_salida_line.set_value(1)
 
         mostrar_info_estudiante(ID1)
         time.sleep(4)  
-        relay_entrada_line.set_value(1)
-        relay_salida_line.set_value(1)
+        relay_entrada_line.set_value(0)
+        relay_salida_line.set_value(0)
         print("Relevadores desactivados\n")
     else:
         root.after(0, lambda: messagebox.showerror("Acceso denegado", "ID no registrado en el sistema."))
