@@ -1,6 +1,6 @@
 1️⃣ Clonar el repositorio
 
-	git clone https://github.com/tu_usuario/tu_repositorio.git
+	git clone https://github.com/AaronOmarContreras/Sistema-de-Acceso-UPSRJ.git
 	cd tu_repositorio
 
 2️⃣ Crear un entorno virtual (opcional pero recomendado)
