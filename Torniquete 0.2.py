@@ -150,7 +150,7 @@ def on_entry_change(event, tipo_rele):
         thread.start()
 
 # Función para activar relevador, registrar log y mostrar información del estudiante
-def activar_rele_y_mostrar_info(ID1, tipo_rele,widget):
+def activar_rele_y_mostrar_info(ID1, tipo_rele,widget=None):
     print(f"\n Recibido ID1: {ID1} desde {tipo_rele.upper()}")
 
     if validar_ID_de_acceso(ID1):
@@ -169,8 +169,8 @@ def activar_rele_y_mostrar_info(ID1, tipo_rele,widget):
         print("Relevadores desactivados\n")
     else:
         root.after(0, lambda: messagebox.showerror("Acceso denegado", "ID no registrado en el sistema."))
-
-        root.after(0, lambda: widget.config(state="normal"))
+        if widget is not None:
+            root.after(0, lambda: widget.config(state="normal"))
 
 def read_rfid(device_path, tipo_rele):
     dev = InputDevice(device_path)
