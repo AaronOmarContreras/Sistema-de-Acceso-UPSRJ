@@ -1,5 +1,6 @@
 pymysql
-#gpiod
+gpiod
 Pillow
 tk
 evdev
+python-dotenv
