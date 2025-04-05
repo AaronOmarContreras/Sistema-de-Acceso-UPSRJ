@@ -2,3 +2,4 @@ pymysql
 #gpiod
 Pillow
 tk
+evdev
