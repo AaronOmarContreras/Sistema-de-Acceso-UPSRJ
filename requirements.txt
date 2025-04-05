@@ -1,4 +1,4 @@
 pymysql
-gpiod
+#gpiod
 Pillow
 tk
