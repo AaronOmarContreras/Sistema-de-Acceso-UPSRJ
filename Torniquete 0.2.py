@@ -120,7 +120,7 @@ def mostrar_info_estudiante(ID1):
         label_info = tk.Label(ventana_info, text=info_texto, font=("Arial", 12))
         label_info.pack()
 
-        imagen_path = os.path.join(CARPETA_IMAGENES, f"{ID1}.jpg")
+        imagen_path = os.path.join(CARPETA_IMAGENES, f"0{ID1}.jpg")
         if os.path.exists(imagen_path):
             img = Image.open(imagen_path)
             img = img.resize((200, 200))
