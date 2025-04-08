@@ -11,6 +11,8 @@ from evdev import InputDevice, categorize, ecodes
 # --- Importación para cargar variables de entorno .env ---
 from dotenv import load_dotenv
 load_dotenv()
+#---Globales---
+PROCESS_FLAG = False
 
 # --- Variables de conexión obtenidas desde archivo .env ---
 DB_USER = os.getenv("DB_USER")
@@ -138,36 +140,51 @@ def mostrar_info_estudiante(ID1):
 
 # Función que detecta cuando el lector RFID inserta un código en el campo de entrada
 def on_entry_change(event):
+    global PROCESS_FLAG
+    if PROCESS_FLAG:
+        return
     ID1 = entry_id.get()
     tipo_rele = tipo_combobox.get()
     if len(ID1) >= 20:
+        PROCESS_FLAG = True
         entry_id.config(state="disabled")
         print(f"Código leído ({tipo_rele}): {ID1}")
         entry_id.after(100, entry_id.delete, 0, 'end')
-        thread = threading.Thread(target=activar_rele_y_mostrar_info, args=(ID1, tipo_rele))
+        thread = threading.Thread(target=activar_rele_y_mostrar_info, args=(ID1, tipo_rele,entry_id))   
         thread.start()
 
 # Función para activar relevador, registrar log y mostrar información del estudiante
 def activar_rele_y_mostrar_info(ID1, tipo_rele, widget=None):
-    print(f"\n Recibido ID1: {ID1} desde {tipo_rele.upper()}")
-    if validar_ID_de_acceso(ID1):
-        registrar_log(ID1, tipo_rele)
-        if tipo_rele == "entrada":
-            print("Activando relevador de ENTRADA")
-            relay_entrada_line.set_value(1)
-        elif tipo_rele == "salida":
-            print("Activando relevador de SALIDA")
-            relay_salida_line.set_value(1)
-        mostrar_info_estudiante(ID1)
-        time.sleep(4)
-        relay_entrada_line.set_value(0)
-        relay_salida_line.set_value(0)
-        print("Relevadores desactivados\n")
-    else:
-        root.after(0, lambda: messagebox.showerror("Acceso denegado", "ID no registrado en el sistema."))
-        if widget is not None:
-            root.after(0, lambda: widget.config(state="normal"))
+    global PROCESS_FLAG
+    try:
+        print(f"\n Recibido ID1: {ID1} desde {tipo_rele.upper()}")
+        if validar_ID_de_acceso(ID1):
+            registrar_log(ID1, tipo_rele)
+            if tipo_rele == "entrada":
+                print("Activando relevador de ENTRADA")
+                relay_entrada_line.set_value(1)
+            elif tipo_rele == "salida":
+                print("Activando relevador de SALIDA")
+                relay_salida_line.set_value(1)
+            mostrar_info_estudiante(ID1)
+            time.sleep(4)
+            relay_entrada_line.set_value(0)
+            relay_salida_line.set_value(0)
+            print("Relevadores desactivados\n")
+        else:
+            root.after(0, lambda: messagebox.showerror("Acceso denegado", "ID no registrado en el sistema."))
+            if widget is not None:
+                root.after(0, lambda: widget.config(state="normal"))
+    except Exception as e:
+        root.after(0, lambda: messagebox.showerror("Error", f"Error al procesar el ID: {e}"))
 
+    finally:
+        PROCESS_FLAG = False
+        root.after(0, lambda: widget.config(state="normal"))
+
+    
+    
+# Función para leer el RFID desde el dispositivo
 def read_rfid(device_path, tipo_rele):
     dev = InputDevice(device_path)
     rfid_code = ""
@@ -187,6 +204,19 @@ def read_rfid(device_path, tipo_rele):
                     key = key[4:]
                 rfid_code += key
 
+
+# --- Botón para registrar manualmente ---#
+def registrar_manual():
+    ID1 = entry_id.get()
+    tipo_rele = tipo_combobox.get()
+    if not ID1:
+        messagebox.showerror("Error", "Por favor ingresa un ID válido.")
+        return
+    entry_id.delete(0, tk.END)
+    root.after(0,activar_rele_y_mostrar_info, ID1, tipo_rele, entry_id)
+
+
+# --- Configuración de la interfaz gráfica --- #
 root = tk.Tk()
 root.title("Control de Acceso UPSRJ (RFID)")
 root.geometry("800x600")
@@ -208,15 +238,6 @@ tipo_combobox = ttk.Combobox(frame_unico, values=["entrada", "salida"], font=("A
 tipo_combobox.current(0)
 tipo_combobox.pack(pady=10)
 
-# --- Botón para registrar manualmente ---
-def registrar_manual():
-    ID1 = entry_id.get()
-    tipo_rele = tipo_combobox.get()
-    if not ID1:
-        messagebox.showerror("Error", "Por favor ingresa un ID válido.")
-        return
-    entry_id.delete(0, tk.END)
-    threading.Thread(target=activar_rele_y_mostrar_info, args=(ID1, tipo_rele)).start()
 
 btn_manual = tk.Button(frame_unico, text="Registrar Manualmente", command=registrar_manual, font=("Arial", 12), bg="#2196F3", fg="white", padx=10, pady=5)
 btn_manual.pack(pady=10)
