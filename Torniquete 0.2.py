@@ -102,9 +102,8 @@ def mostrar_registros():
     tree.column("tipo", width=100)
     tree.column("fecha", width=150)
 
-    for reg in registros:
-        tree.insert("", tk.END, values=reg)
-
+    
+    
     tree.pack(fill=tk.BOTH, expand=True)
     scrollbar = ttk.Scrollbar(ventana_tabla, orient="vertical", command=tree.yview)
     tree.configure(yscrollcommand=scrollbar.set)
@@ -122,7 +121,8 @@ def mostrar_info_estudiante(ID1):
         label_info = tk.Label(ventana_info, text=info_texto, font=("Arial", 12))
         label_info.pack()
 
-        imagen_path = os.path.join(CARPETA_IMAGENES, f"0{ID1}.jpg")
+        imagen_path = os.path.join(CARPETA_IMAGENES, f"0{matricula}.jpg")
+        print(f'Ruta de imagen: {imagen_path}')
         if os.path.exists(imagen_path):
             img = Image.open(imagen_path)
             img = img.resize((200, 200))
@@ -145,19 +145,20 @@ def on_entry_change(event):
         return
     ID1 = entry_id.get()
     tipo_rele = tipo_combobox.get()
-    if len(ID1) >= 20:
+    if len(ID1) > 10:
         PROCESS_FLAG = True
         entry_id.config(state="disabled")
         print(f"Código leído ({tipo_rele}): {ID1}")
-        entry_id.after(100, entry_id.delete, 0, 'end')
-        thread = threading.Thread(target=activar_rele_y_mostrar_info, args=(ID1, tipo_rele,entry_id))   
+        entry_id.delete(0, tk.END)
+        thread = threading.Thread(target=activar_rele_y_mostrar_info, args=(ID1, tipo_rele))   
         thread.start()
 
 # Función para activar relevador, registrar log y mostrar información del estudiante
-def activar_rele_y_mostrar_info(ID1, tipo_rele, widget=None):
+def activar_rele_y_mostrar_info(ID1, tipo_rele):
     global PROCESS_FLAG
     try:
         print(f"\n Recibido ID1: {ID1} desde {tipo_rele.upper()}")
+        entry_id.config(state="disabled")
         if validar_ID_de_acceso(ID1):
             registrar_log(ID1, tipo_rele)
             if tipo_rele == "entrada":
@@ -167,20 +168,22 @@ def activar_rele_y_mostrar_info(ID1, tipo_rele, widget=None):
                 print("Activando relevador de SALIDA")
                 relay_salida_line.set_value(1)
             mostrar_info_estudiante(ID1)
-            time.sleep(4)
+            time.sleep(7)
             relay_entrada_line.set_value(0)
             relay_salida_line.set_value(0)
             print("Relevadores desactivados\n")
         else:
             root.after(0, lambda: messagebox.showerror("Acceso denegado", "ID no registrado en el sistema."))
-            if widget is not None:
-                root.after(0, lambda: widget.config(state="normal"))
+            if entry_id is not None:
+    
+    
+                root.after(0, lambda: entry_id.config(state="normal"))
     except Exception as e:
         root.after(0, lambda: messagebox.showerror("Error", f"Error al procesar el ID: {e}"))
 
     finally:
         PROCESS_FLAG = False
-        root.after(0, lambda: widget.config(state="normal"))
+        root.after(0, lambda: entry_id.config(state="normal"))
 
     
     
@@ -197,6 +200,7 @@ def read_rfid(device_path, tipo_rele):
             if key == "KEY_ENTER":
                 if len(rfid_code) > 0:
                     print(f"RFID leído desde {device_path}: {rfid_code}")
+                    entry_id.delete(0, tk.END)
                     root.after(0, activar_rele_y_mostrar_info, rfid_code, tipo_rele)
                     rfid_code = ""
             else:
@@ -213,7 +217,7 @@ def registrar_manual():
         messagebox.showerror("Error", "Por favor ingresa un ID válido.")
         return
     entry_id.delete(0, tk.END)
-    root.after(0,activar_rele_y_mostrar_info, ID1, tipo_rele, entry_id)
+    root.after(0,activar_rele_y_mostrar_info, ID1, tipo_rele)
 
 
 # --- Configuración de la interfaz gráfica --- #
@@ -223,10 +227,10 @@ root.geometry("800x600")
 root.minsize(500, 300)
 
 # --- Sección única de entrada de ID y tipo de acceso ---
-frame_unico = tk.Frame(root, bg="#f4f4f4", padx=30, pady=40)
+frame_unico = tk.Frame(root, padx=30, pady=40)
 frame_unico.pack(pady=30)
 
-label_id = tk.Label(frame_unico, text="Insertar ID o Folio:", font=("Arial", 14), bg="#f4f4f4")
+label_id = tk.Label(frame_unico, text="Insertar ID:", font=("Arial", 14))
 label_id.pack(pady=(0,10))
 
 entry_id = tk.Entry(frame_unico, font=("Arial", 14), width=30, relief="solid", bd=2)
@@ -246,10 +250,10 @@ btn_manual.pack(pady=10)
 btn_registros = tk.Button(root, text="Ver Registros", command=mostrar_registros)
 btn_registros.pack(pady=10)
 
-lector_entrada_1 = "/dev/input/event14"
+lector_entrada_1 = "/dev/input/event6"
 lector_entrada_2 = "/dev/input/event4"
-lector_salida_1  = "/dev/input/event15"
-lector_salida_2  = "/dev/input/event6"
+lector_salida_1  = "/dev/input/event7"
+lector_salida_2  = "/dev/input/event10"
 
 threading.Thread(target=read_rfid, args=(lector_entrada_1, "entrada"), daemon=True).start()
 threading.Thread(target=read_rfid, args=(lector_entrada_2, "entrada"), daemon=True).start()
