@@ -149,8 +149,8 @@ def on_entry_change(event):
         PROCESS_FLAG = True
         entry_id.config(state="disabled")
         print(f"Código leído ({tipo_rele}): {ID1}")
-        entry_id.delete(0, tk.END)
-        thread = threading.Thread(target=activar_rele_y_mostrar_info, args=(ID1, tipo_rele))   
+        thread = threading.Thread(target=activar_rele_y_mostrar_info, args=(ID1, tipo_rele))
+      
         thread.start()
 
 # Función para activar relevador, registrar log y mostrar información del estudiante
@@ -158,6 +158,7 @@ def activar_rele_y_mostrar_info(ID1, tipo_rele):
     global PROCESS_FLAG
     try:
         print(f"\n Recibido ID1: {ID1} desde {tipo_rele.upper()}")
+        entry_id.delete(0,tk.END)
         entry_id.config(state="disabled")
         if validar_ID_de_acceso(ID1):
             registrar_log(ID1, tipo_rele)
@@ -200,7 +201,6 @@ def read_rfid(device_path, tipo_rele):
             if key == "KEY_ENTER":
                 if len(rfid_code) > 0:
                     print(f"RFID leído desde {device_path}: {rfid_code}")
-                    entry_id.delete(0, tk.END)
                     root.after(0, activar_rele_y_mostrar_info, rfid_code, tipo_rele)
                     rfid_code = ""
             else:
@@ -250,10 +250,10 @@ btn_manual.pack(pady=10)
 btn_registros = tk.Button(root, text="Ver Registros", command=mostrar_registros)
 btn_registros.pack(pady=10)
 
-lector_entrada_1 = "/dev/input/event6"
+lector_entrada_1 = "/dev/input/event10"
 lector_entrada_2 = "/dev/input/event4"
 lector_salida_1  = "/dev/input/event7"
-lector_salida_2  = "/dev/input/event10"
+lector_salida_2  = "/dev/input/event9"
 
 threading.Thread(target=read_rfid, args=(lector_entrada_1, "entrada"), daemon=True).start()
 threading.Thread(target=read_rfid, args=(lector_entrada_2, "entrada"), daemon=True).start()
