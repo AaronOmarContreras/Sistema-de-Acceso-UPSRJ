@@ -102,6 +102,8 @@ def mostrar_registros():
     tree.column("tipo", width=100)
     tree.column("fecha", width=150)
 
+    for reg in registros:
+        tree.insert("", tk.END, values=reg)
     
     
     tree.pack(fill=tk.BOTH, expand=True)
