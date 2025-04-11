@@ -3,3 +3,4 @@ gpiod
 Pillow
 tk
 evdev
+python-dotenv
