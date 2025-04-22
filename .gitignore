@@ -1,3 +1,4 @@
 venvProyecto_UPSRJ/
 .vscode/
 __pycache__/
+*.pyc
