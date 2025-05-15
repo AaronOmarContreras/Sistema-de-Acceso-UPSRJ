@@ -6,24 +6,20 @@ from tkinter import messagebox, ttk
 from PIL import Image, ImageTk
 import os
 import threading
-from evdev import InputDevice, categorize, ecodes
-
-# --- Importación para cargar variables de entorno .env ---
+from evdev import InputDevice, categorize, ecodes, list_devices
 from dotenv import load_dotenv
-load_dotenv()
-#---Globales---
-PROCESS_FLAG = False
 
-# --- Variables de conexión obtenidas desde archivo .env ---
+# --- Carga de variables de entorno ---
+load_dotenv()
 DB_USER = os.getenv("DB_USER")
 DB_PASS = os.getenv("DB_PASS")
 DB_NAME = os.getenv("DB_NAME")
 DB_HOST = os.getenv("DB_HOST")
 
-# Ruta donde están almacenadas las imágenes de los estudiantes
+# Carpeta de imágenes
 CARPETA_IMAGENES = "/home/victor/Desktop/Control de acceso estudiantil UPSRJ/FOTOS Alumnos UPSRJ"
 
-# Configuración de GPIO para relevadores
+# --- Configuración de GPIO para relevadores ---
 RELAY_ENTRADA_PIN = 17
 RELAY_SALIDA_PIN = 27
 chip = gpiod.Chip('gpiochip4')
@@ -32,51 +28,50 @@ relay_salida_line = chip.get_line(RELAY_SALIDA_PIN)
 relay_entrada_line.request(consumer="RelayEntrada", type=gpiod.LINE_REQ_DIR_OUT)
 relay_salida_line.request(consumer="RelaySalida", type=gpiod.LINE_REQ_DIR_OUT)
 
-# Función para obtener datos del estudiante
+# --- Funciones de base de datos ---
 def obtener_datos_estudiante(ID1):
     conn = pymysql.connect(user=DB_USER, password=DB_PASS, host=DB_HOST, database=DB_NAME)
     cursor = conn.cursor()
-    cursor.execute(f"SELECT Nombre, Carrera, MATRICULA FROM estudiantes WHERE ID1 = '{ID1}'")
-    datos_estudiante = cursor.fetchone()
+    cursor.execute("SELECT Nombre, Carrera, MATRICULA FROM estudiantes WHERE ID1 = %s", (ID1,))
+    datos = cursor.fetchone()
     conn.close()
-    return datos_estudiante
+    return datos
 
-# Función para verificar si el ID1 está registrado
+
 def validar_ID_de_acceso(ID1):
     conn = pymysql.connect(user=DB_USER, password=DB_PASS, host=DB_HOST, database=DB_NAME)
     cursor = conn.cursor()
-    cursor.execute(f"SELECT ID1 FROM estudiantes WHERE ID1 = '{ID1}'")
-    datos = cursor.fetchall()
+    cursor.execute("SELECT 1 FROM estudiantes WHERE ID1 = %s", (ID1,))
+    exists = cursor.fetchone() is not None
     conn.close()
-    return any(dato[0] for dato in datos)
+    return exists
 
-# Función para registrar el log de acceso
+
 def registrar_log(ID1, tipo):
     datos = obtener_datos_estudiante(ID1)
     if datos:
         nombre, carrera, matricula = datos
     else:
-        nombre = "Desconocido"
-        carrera = "Desconocida"
-        matricula = "Desconocida"
+        nombre, carrera, matricula = ("Desconocido", "Desconocida", "Desconocida")
     try:
         conn = pymysql.connect(user=DB_USER, password=DB_PASS, host=DB_HOST, database=DB_NAME)
         cursor = conn.cursor()
-        query = "INSERT INTO registros (ID1, tipo_de_registro, nombre, matricula, carrera ,fecha) VALUES (%s, %s, %s, %s,%s ,NOW())"
-        cursor.execute(query, (ID1, tipo, nombre, matricula, carrera))
+        cursor.execute(
+            "INSERT INTO registros (ID1, tipo_de_registro, nombre, matricula, carrera, fecha) VALUES (%s,%s,%s,%s,%s,NOW())",
+            (ID1, tipo, nombre, matricula, carrera)
+        )
         conn.commit()
     except Exception as e:
         print("Error al registrar log:", e)
     finally:
         conn.close()
 
-# Función para mostrar registros de acceso
+
 def mostrar_registros():
     try:
         conn = pymysql.connect(user=DB_USER, password=DB_PASS, host=DB_HOST, database=DB_NAME)
         cursor = conn.cursor()
-        query = "SELECT matricula, nombre, carrera, tipo_de_registro, fecha FROM registros ORDER BY fecha DESC"
-        cursor.execute(query)
+        cursor.execute("SELECT matricula, nombre, carrera, tipo_de_registro, fecha FROM registros ORDER BY fecha DESC")
         registros = cursor.fetchall()
     except Exception as e:
         messagebox.showerror("Error", f"No se pudieron obtener los registros: {e}")
@@ -84,190 +79,132 @@ def mostrar_registros():
     finally:
         conn.close()
 
-    ventana_tabla = tk.Toplevel()
+    ventana_tabla = tk.Toplevel(root_entrada)
     ventana_tabla.title("Registros de Acceso")
-
-    columnas = ("matricula", "nombre", "carrera", "tipo", "fecha")
-    tree = ttk.Treeview(ventana_tabla, columns=columnas, show="headings")
-
-    tree.heading("matricula", text="Matrícula")
-    tree.heading("nombre", text="Nombre")
-    tree.heading("carrera", text="Carrera")
-    tree.heading("tipo", text="Tipo")
-    tree.heading("fecha", text="Fecha")
-
-    tree.column("matricula", width=100)
-    tree.column("nombre", width=200)
-    tree.column("carrera", width=150)
-    tree.column("tipo", width=100)
-    tree.column("fecha", width=150)
-
+    cols = ("matricula","nombre","carrera","tipo","fecha")
+    tree = ttk.Treeview(ventana_tabla, columns=cols, show="headings")
+    for c,text in zip(cols, ["Matrícula","Nombre","Carrera","Tipo","Fecha"]):
+        tree.heading(c, text=text)
+        tree.column(c, width=120)
     for reg in registros:
         tree.insert("", tk.END, values=reg)
-    
-    
     tree.pack(fill=tk.BOTH, expand=True)
-    scrollbar = ttk.Scrollbar(ventana_tabla, orient="vertical", command=tree.yview)
-    tree.configure(yscrollcommand=scrollbar.set)
-    scrollbar.pack(side="right", fill="y")
+    sb = ttk.Scrollbar(ventana_tabla, orient="vertical", command=tree.yview)
+    tree.configure(yscrollcommand=sb.set)
+    sb.pack(side=tk.RIGHT, fill=tk.Y)
 
-# Función para mostrar información e imagen del estudiante
-def mostrar_info_estudiante(ID1):
-    datos_estudiante = obtener_datos_estudiante(ID1)
-    if datos_estudiante:
-        nombre, carrera, matricula = datos_estudiante
-        info_texto = f"Nombre: {nombre}\nCarrera: {carrera}\nMATRICULA: {matricula}"
-        ventana_info = tk.Toplevel()
-        ventana_info.title("Información del Estudiante")
+# --- RFID y relevadores ---
+PROCESS_FLAG = False
 
-        label_info = tk.Label(ventana_info, text=info_texto, font=("Arial", 12))
-        label_info.pack()
+def read_rfid(device_path, tipo_rele):
+    dev = InputDevice(device_path)
+    codigo = ""
+    for event in dev.read_loop():
+        if event.type == ecodes.EV_KEY and event.value == 1:
+            key = categorize(event).keycode
+            if isinstance(key, list): key = key[0]
+            if key == "KEY_ENTER":
+                if codigo:
+                    root_entrada.after(0, activar_rele_y_mostrar_info, codigo, tipo_rele)
+                    codigo = ""
+            else:
+                if key.startswith("KEY_"):
+                    codigo += key[4:]
 
-        imagen_path = os.path.join(CARPETA_IMAGENES, f"0{matricula}.jpg")
-        print(f'Ruta de imagen: {imagen_path}')
-        if os.path.exists(imagen_path):
-            img = Image.open(imagen_path)
-            img = img.resize((200, 200))
-            img = ImageTk.PhotoImage(img)
 
-            label_imagen = tk.Label(ventana_info, image=img)
-            label_imagen.image = img
-            label_imagen.pack(padx=10, pady=10)
-        else:
-            tk.Label(ventana_info, text="Imagen no encontrada", fg="red").pack()
-
-        ventana_info.after(10000, ventana_info.destroy)
-    else:
-        messagebox.showerror("Error", "Estudiante no encontrado.")
-
-# Función que detecta cuando el lector RFID inserta un código en el campo de entrada
-def on_entry_change(event):
-    global PROCESS_FLAG
-    if PROCESS_FLAG:
-        return
-    ID1 = entry_id.get()
-    tipo_rele = tipo_combobox.get()
-    if len(ID1) > 10:
-        PROCESS_FLAG = True
-        entry_id.config(state="disabled")
-        print(f"Código leído ({tipo_rele}): {ID1}")
-        thread = threading.Thread(target=activar_rele_y_mostrar_info, args=(ID1, tipo_rele))
-      
-        thread.start()
-
-# Función para activar relevador, registrar log y mostrar información del estudiante
 def activar_rele_y_mostrar_info(ID1, tipo_rele):
     global PROCESS_FLAG
+    if PROCESS_FLAG: return
+    PROCESS_FLAG = True
+    entry_id_widget.config(state="disabled")
     try:
-        print(f"\n Recibido ID1: {ID1} desde {tipo_rele.upper()}")
-        entry_id.delete(0,tk.END)
-        entry_id.config(state="disabled")
         if validar_ID_de_acceso(ID1):
             registrar_log(ID1, tipo_rele)
             if tipo_rele == "entrada":
-                print("Activando relevador de ENTRADA")
                 relay_entrada_line.set_value(1)
-            elif tipo_rele == "salida":
-                print("Activando relevador de SALIDA")
+            else:
                 relay_salida_line.set_value(1)
-            mostrar_info_estudiante(ID1)
-            time.sleep(7)
+            mostrar_info_estudiante(ID1, tipo_rele)
+            time.sleep(5)
             relay_entrada_line.set_value(0)
             relay_salida_line.set_value(0)
-            print("Relevadores desactivados\n")
         else:
-            root.after(0, lambda: messagebox.showerror("Acceso denegado", "ID no registrado en el sistema."))
-            if entry_id is not None:
-    
-    
-                root.after(0, lambda: entry_id.config(state="normal"))
+            messagebox.showerror("Acceso denegado", "ID no registrado.")
     except Exception as e:
-        root.after(0, lambda: messagebox.showerror("Error", f"Error al procesar el ID: {e}"))
-
+        messagebox.showerror("Error", f"Procesando ID: {e}")
     finally:
         PROCESS_FLAG = False
-        root.after(0, lambda: entry_id.config(state="normal"))
-
-    
-    
-# Función para leer el RFID desde el dispositivo
-def read_rfid(device_path, tipo_rele):
-    dev = InputDevice(device_path)
-    rfid_code = ""
-    for event in dev.read_loop():
-        if event.type == ecodes.EV_KEY and event.value == 1:
-            key_event = categorize(event)
-            key = key_event.keycode
-            if isinstance(key, list):
-                key = key[0]
-            if key == "KEY_ENTER":
-                if len(rfid_code) > 0:
-                    print(f"RFID leído desde {device_path}: {rfid_code}")
-                    root.after(0, activar_rele_y_mostrar_info, rfid_code, tipo_rele)
-                    rfid_code = ""
-            else:
-                if key.startswith("KEY_"):
-                    key = key[4:]
-                rfid_code += key
+        entry_id_widget.config(state="normal")
 
 
-# --- Botón para registrar manualmente ---#
-def registrar_manual():
-    ID1 = entry_id.get()
-    tipo_rele = tipo_combobox.get()
-    if not ID1:
-        messagebox.showerror("Error", "Por favor ingresa un ID válido.")
-        return
-    entry_id.delete(0, tk.END)
-    root.after(0,activar_rele_y_mostrar_info, ID1, tipo_rele)
+def mostrar_info_estudiante(ID1, tipo_rele):
+    datos = obtener_datos_estudiante(ID1)
+    ventana = tk.Toplevel(root_entrada if tipo_rele == "entrada" else root_salida)
+    ventana.title(f"{tipo_rele.title()} — {ID1}")
+    x_offset = 50 if tipo_rele=="entrada" else mitad_w + 50
+    ventana.geometry(f"+{x_offset}+50")
+    if datos:
+        nombre,carrera,matricula = datos
+        tk.Label(ventana, text=f"Nombre: {nombre}", font=("Arial",16)).pack(pady=5)
+        tk.Label(ventana, text=f"Carrera: {carrera}", font=("Arial",14)).pack(pady=5)
+        tk.Label(ventana, text=f"Matrícula: {matricula}", font=("Arial",14)).pack(pady=5)
+        img_path = os.path.join(CARPETA_IMAGENES, f"0{matricula}.jpg")
+        if os.path.exists(img_path):
+            img = Image.open(img_path).resize((200,200))
+            imgtk = ImageTk.PhotoImage(img)
+            lbl = tk.Label(ventana, image=imgtk); lbl.image = imgtk; lbl.pack(pady=10)
+        else:
+            tk.Label(ventana, text="Imagen no encontrada", fg="red").pack()
+    else:
+        tk.Label(ventana, text="Estudiante no encontrado", fg="red").pack()
+    ventana.after(8000, ventana.destroy)
 
+# --- Detección automática de lectores RFID ---
+def detectar_lectores_RFID(min_lectores=4):
+    devs = [InputDevice(p) for p in list_devices()]
+    paths = [d.path for d in devs if 'RFID' in d.name.upper()]
+    if len(paths) < min_lectores:
+        raise RuntimeError(f"Se detectaron {len(paths)} lectores; esperados {min_lectores}.")
+    return paths[:min_lectores]
 
-# --- Configuración de la interfaz gráfica --- #
-root = tk.Tk()
-root.title("Control de Acceso UPSRJ (RFID)")
-root.geometry("800x600")
-root.minsize(500, 300)
+# --- Punto de inicio ---
+if __name__ == "__main__":
+    # Detectar lectores
+    l_e1,l_e2,l_s1,l_s2 = detectar_lectores_RFID()
+    # Crear ventanas
+    root_entrada = tk.Tk()
+    root_entrada.title("Control de Acceso UPSRJ — Entrada")
+    root_entrada.update_idletasks()
+    total_w = root_entrada.winfo_screenwidth()
+    total_h = root_entrada.winfo_screenheight()
+    mitad_w = total_w // 2
+    root_entrada.geometry(f"{mitad_w}x{total_h}+0+0")
+    # Frame Entrada
+    frame_e = tk.Frame(root_entrada, padx=20, pady=20)
+    frame_e.pack(fill=tk.BOTH, expand=True)
+    tk.Label(frame_e, text="Insertar ID:", font=("Arial",14)).pack(pady=5)
+    entry_id_widget = tk.Entry(frame_e, font=("Arial",14), width=30)
+    entry_id_widget.pack(pady=5); entry_id_widget.focus()
+    entry_id_widget.bind('<Return>', lambda e: activar_rele_y_mostrar_info(entry_id_widget.get(), tipo_combo.get()))
+    tipo_combo = ttk.Combobox(frame_e, values=["entrada","salida"], state="readonly", font=("Arial",12), width=28)
+    tipo_combo.current(0); tipo_combo.pack(pady=5)
+    tk.Button(frame_e, text="Registrar Manual", command=lambda: activar_rele_y_mostrar_info(entry_id_widget.get(), tipo_combo.get()), font=("Arial",12)).pack(pady=10)
+    tk.Button(frame_e, text="Ver Registros", command=mostrar_registros).pack(pady=5)
+    # Ventana Salida
+    root_salida = tk.Toplevel(root_entrada)
+    root_salida.title("Control de Acceso UPSRJ — Salida")
+    root_salida.geometry(f"{mitad_w}x{total_h}+{mitad_w}+0")
+    frame_s = tk.Frame(root_salida, padx=20, pady=20)
+    frame_s.pack(fill=tk.BOTH, expand=True)
+    tk.Label(frame_s, text="Pantalla de Salida", font=("Arial",16)).pack(pady=10)
 
-# --- Sección única de entrada de ID y tipo de acceso ---
-frame_unico = tk.Frame(root, padx=30, pady=40)
-frame_unico.pack(pady=30)
+    # Iniciar threads RFID
+    for path,tipo in [(l_e1,'entrada'),(l_e2,'entrada'),(l_s1,'salida'),(l_s2,'salida')]:
+        threading.Thread(target=read_rfid, args=(path,tipo), daemon=True).start()
 
-label_id = tk.Label(frame_unico, text="Insertar ID:", font=("Arial", 14))
-label_id.pack(pady=(0,10))
-
-entry_id = tk.Entry(frame_unico, font=("Arial", 14), width=30, relief="solid", bd=2)
-entry_id.pack(pady=5)
-entry_id.focus_set()
-entry_id.bind('<KeyRelease>', on_entry_change)
-
-tipo_combobox = ttk.Combobox(frame_unico, values=["entrada", "salida"], font=("Arial", 12), state="readonly", width=28)
-tipo_combobox.current(0)
-tipo_combobox.pack(pady=10)
-
-
-btn_manual = tk.Button(frame_unico, text="Registrar Manualmente", command=registrar_manual, font=("Arial", 12), bg="#2196F3", fg="white", padx=10, pady=5)
-btn_manual.pack(pady=10)
-
-# Botón para mostrar registros de acceso
-btn_registros = tk.Button(root, text="Ver Registros", command=mostrar_registros)
-btn_registros.pack(pady=10)
-
-lector_entrada_1 = "/dev/input/event10"
-lector_entrada_2 = "/dev/input/event4"
-lector_salida_1  = "/dev/input/event7"
-lector_salida_2  = "/dev/input/event9"
-
-threading.Thread(target=read_rfid, args=(lector_entrada_1, "entrada"), daemon=True).start()
-threading.Thread(target=read_rfid, args=(lector_entrada_2, "entrada"), daemon=True).start()
-threading.Thread(target=read_rfid, args=(lector_salida_1, "salida"), daemon=True).start()
-threading.Thread(target=read_rfid, args=(lector_salida_2, "salida"), daemon=True).start()
-
-print("\nSistema en funcionamiento... esperando lectura RFID.\n")
-
-# Mantener la ejecución de la interfaz gráfica en el hilo principal
-try:
-    root.mainloop()
-except KeyboardInterrupt:
-    print("\nFinalizando programa.")
+    # Ejecutar GUI
+    print("Sistema en funcionamiento...")
+    root_entrada.mainloop()
+    # Liberar líneas GPIO al cerrar
     relay_entrada_line.release()
     relay_salida_line.release()
